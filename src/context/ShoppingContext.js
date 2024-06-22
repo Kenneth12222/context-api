@@ -1,6 +1,5 @@
 
-
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 
 // Create a new context for shopping
 const ShoppingContext = createContext();
@@ -10,46 +9,58 @@ export const useShopping = () => {
     return useContext(ShoppingContext);
 };
 
+// API call to fetch products
+const fetchProducts = async () => {
+    const response = await fetch('https://fakestoreapi.com/products');
+    if (!response.ok) {
+        throw new Error('Failed to fetch products');
+    }
+    return await response.json();
+};
+
 const ShoppingProvider = ({ children }) => {
     const [products, setProducts] = useState([]);
     const [cart, setCart] = useState([]);
     const [isCartOpen, setIsCartOpen] = useState(false);
 
     useEffect(() => {
-        fetch('https://fakestoreapi.com/products')
-            .then((res) => res.json())
-            .then((data) => setProducts(data))
+        const loadProducts = async () => {
+            try {
+                const data = await fetchProducts();
+                setProducts(data);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+            }
+        };
+
+        loadProducts();
     }, []);
 
-    const addToCart = (product) => {
-        setCart([...cart, { ...product, quantity: 1 }]);
-    };
+    const addToCart = useCallback((product) => {
+        setCart((prevCart) => [...prevCart, { ...product, quantity: 1 }]);
+    }, []);
 
-    const removeFromCart = (productId) => {
-        const updatedCart = cart.filter((item) => item.id !== productId);
-        setCart(updatedCart);
-    };
+    const removeFromCart = useCallback((productId) => {
+        setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+    }, []);
 
-    const increaseQuantity = (productId) => {
-        const updatedCart = cart.map((item) =>
+    const increaseQuantity = useCallback((productId) => {
+        setCart((prevCart) => prevCart.map((item) =>
             item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
-        );
-        setCart(updatedCart);
-    };
+        ));
+    }, []);
 
-    const decreaseQuantity = (productId) => {
-        const updatedCart = cart.map((item) =>
+    const decreaseQuantity = useCallback((productId) => {
+        setCart((prevCart) => prevCart.map((item) =>
             item.id === productId && item.quantity > 1 ? { ...item, quantity: item.quantity - 1 } : item
-        );
-        setCart(updatedCart);
-    };
+        ));
+    }, []);
 
-    const toggleCart = () => {
-        setIsCartOpen(!isCartOpen);
-    };
+    const toggleCart = useCallback(() => {
+        setIsCartOpen((prevIsCartOpen) => !prevIsCartOpen);
+    }, []);
 
-    // Value provided by the context
-    const value = {
+    const value = useMemo(() => ({
         products,
         cart,
         isCartOpen,
@@ -58,11 +69,9 @@ const ShoppingProvider = ({ children }) => {
         increaseQuantity,
         decreaseQuantity,
         toggleCart,
-    };
+    }), [products, cart, isCartOpen, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, toggleCart]);
 
     return <ShoppingContext.Provider value={value}>{children}</ShoppingContext.Provider>;
 };
 
 export { ShoppingProvider };
-
-
